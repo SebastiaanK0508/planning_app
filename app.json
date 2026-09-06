@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "Webplanning",
+    "slug": "webplanning",
+    "scheme": "webplanning",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "primaryColor": "#4361ee",
+    "backgroundColor": "#FFFFFF",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "nl.webplanning.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Webplanning gebruikt de camera om een profielfoto te maken.",
+        "NSPhotoLibraryUsageDescription": "Webplanning gebruikt je foto's om een profielfoto in te stellen."
+      }
+    },
+    "android": {
+      "package": "nl.webplanning.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "NOTIFICATIONS",
+        "POST_NOTIFICATIONS"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-splash-screen",
+      "expo-status-bar",
+      "expo-image",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4361ee"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Webplanning gebruikt je foto's om een profielfoto in te stellen.",
+          "cameraPermission": "Webplanning gebruikt de camera om een profielfoto te maken."
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "apiUrl": "https://app.webplanning.nl",
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    }
+  }
+}
