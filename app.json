@@ -29,8 +29,9 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "NOTIFICATIONS",
-        "POST_NOTIFICATIONS"
+        "android.permission.NOTIFICATIONS",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -68,8 +69,9 @@
       "router": {},
       "apiUrl": "https://app.webplanning.nl",
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+        "projectId": "8ced34e0-1d75-4400-8ef8-7bf5037f9f40"
       }
-    }
+    },
+    "owner": "webius_nl"
   }
 }
