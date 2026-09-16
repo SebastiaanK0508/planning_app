@@ -17,6 +17,7 @@ export const AuthApi = {
 // ---------- Planning: rooster & shifts ----------
 export const PlanningApi = {
     mijnRooster: (uuid: string) => apiRequest(`/api/planning/mijn-rooster/${uuid}`),
+    icsToken: (uuid: string) => apiRequest(`/api/planning/ics-token/${uuid}`) as Promise<{ token: string }>,
     totaal: (orgUuid: string, van: string, tot: string) =>
         apiRequest(`/api/planning/totaal/${orgUuid}`, { query: { van, tot } }),
     getShift: (uuid: string) => apiRequest(`/api/planning/get/${uuid}`),

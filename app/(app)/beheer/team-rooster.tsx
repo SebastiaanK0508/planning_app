@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Card, CenteredLoader, EmptyState, ErrorBanner } from '../../../src/components/ui';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { useAsyncData } from '../../../src/hooks/useAsyncData';
@@ -8,11 +8,41 @@ import { addDays, formatTime, isSameDay, parseServerDate, startOfWeek, toIsoDate
 import { PlanningApi } from '../../../src/lib/services';
 import { colors } from '../../../src/lib/theme';
 
+function todayIndex(): number {
+    return (new Date().getDay() + 6) % 7; // maandag = 0
+}
+
 export default function TeamRoosterScreen() {
     const { user } = useAuth();
     const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
     const dagen = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-    const [selectedDay, setSelectedDay] = useState(0);
+    const [selectedDay, setSelectedDay] = useState(() => todayIndex());
+
+    const goToDay = (delta: number) => {
+        setSelectedDay((prev) => {
+            const next = prev + delta;
+            if (next < 0) {
+                setWeekStart((w) => addDays(w, -7));
+                return 6;
+            }
+            if (next > 6) {
+                setWeekStart((w) => addDays(w, 7));
+                return 0;
+            }
+            return next;
+        });
+    };
+
+    const panResponder = useRef(
+        PanResponder.create({
+            onMoveShouldSetPanResponderCapture: (_evt, gesture) =>
+                Math.abs(gesture.dx) > 20 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+            onPanResponderRelease: (_evt, gesture) => {
+                if (gesture.dx <= -50) goToDay(1);
+                else if (gesture.dx >= 50) goToDay(-1);
+            },
+        })
+    ).current;
 
     const { data, loading, refreshing, error, refresh } = useAsyncData(
         () =>
@@ -31,37 +61,40 @@ export default function TeamRoosterScreen() {
             .sort((a: any, b: any) => new Date(a.start_tijd).getTime() - new Date(b.start_tijd).getTime());
     }, [data, dagen, selectedDay]);
 
+    const dagIsVandaag = isSameDay(dagen[selectedDay], new Date());
+
     return (
-        <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <View style={{ flex: 1, backgroundColor: '#f8fafc' }} {...panResponder.panHandlers}>
             <View style={styles.weekNav}>
                 <Pressable onPress={() => setWeekStart(addDays(weekStart, -7))} style={styles.weekNavBtn}>
-                    <Ionicons name="chevron-back" size={20} color={colors.primary} />
+                    <Ionicons name="chevron-back" size={18} color={colors.primary} />
                 </Pressable>
                 <Text style={styles.weekLabel}>
                     {dagen[0].getDate()} {dagen[0].toLocaleDateString('nl-NL', { month: 'short' })} — {dagen[6].getDate()}{' '}
                     {dagen[6].toLocaleDateString('nl-NL', { month: 'short' })}
                 </Text>
                 <Pressable onPress={() => setWeekStart(addDays(weekStart, 7))} style={styles.weekNavBtn}>
-                    <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+                    <Ionicons name="chevron-forward" size={18} color={colors.primary} />
                 </Pressable>
             </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayTabs} contentContainerStyle={{ paddingHorizontal: 14 }}>
+            <View style={styles.dayTabs}>
                 {dagen.map((d, i) => (
                     <Pressable key={i} onPress={() => setSelectedDay(i)} style={[styles.dayTab, selectedDay === i && styles.dayTabActive]}>
-                        <Text style={[styles.dayTabDow, selectedDay === i && styles.dayTabTextActive]}>
-                            {d.toLocaleDateString('nl-NL', { weekday: 'short' })}
-                        </Text>
                         <Text style={[styles.dayTabNum, selectedDay === i && styles.dayTabTextActive]}>{d.getDate()}</Text>
                     </Pressable>
                 ))}
-            </ScrollView>
+            </View>
 
             {loading ? (
                 <CenteredLoader />
             ) : (
                 <ScrollView contentContainerStyle={{ padding: 20 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
                     <ErrorBanner message={error} />
+                    <Text style={styles.dayHeader}>
+                        {dagIsVandaag ? 'Vandaag · ' : ''}
+                        {dagen[selectedDay].toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </Text>
                     {dagItems.length === 0 ? (
                         <EmptyState title="Niemand ingepland" subtitle="Er staat niets in het rooster op deze dag." />
                     ) : (
@@ -95,20 +128,27 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
         backgroundColor: '#fff',
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },
-    weekNavBtn: { padding: 6 },
-    weekLabel: { fontWeight: '700', color: '#0f172a', fontSize: 14 },
-    dayTabs: { backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 10 },
-    dayTab: { alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, marginRight: 6 },
+    weekNavBtn: { padding: 4 },
+    weekLabel: { fontWeight: '700', color: '#0f172a', fontSize: 13 },
+    dayTabs: {
+        flexDirection: 'row',
+        justifyContent: 'space-evenly',
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+        paddingVertical: 6,
+    },
+    dayTab: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
     dayTabActive: { backgroundColor: colors.primary },
-    dayTabDow: { fontSize: 11, color: colors.textMuted, textTransform: 'capitalize' },
-    dayTabNum: { fontSize: 15, fontWeight: '700', color: '#0f172a', marginTop: 2 },
+    dayTabNum: { fontSize: 13, fontWeight: '700', color: '#0f172a' },
     dayTabTextActive: { color: '#fff' },
+    dayHeader: { fontSize: 14, fontWeight: '700', color: '#334155', marginBottom: 12, textTransform: 'capitalize' },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
     naam: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
     tijd: { fontSize: 13, color: '#334155', marginTop: 2 },
