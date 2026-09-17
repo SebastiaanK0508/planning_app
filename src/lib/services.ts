@@ -27,6 +27,8 @@ export const PlanningApi = {
     deleteShift: (uuid: string) => apiRequest(`/api/planning/delete/${uuid}`, { method: 'DELETE' }),
     updateStatus: (uuid: string, status: string) =>
         apiRequest(`/api/planning/update-status/${uuid}`, { method: 'PUT', body: { status } }),
+    flexSplitsen: (uuid: string, vrij_start: string, vrij_eind: string) =>
+        apiRequest(`/api/planning/flex-splitsen/${uuid}`, { method: 'PUT', body: { vrij_start, vrij_eind } }),
     publiceerWeek: (body: Record<string, unknown>) =>
         apiRequest('/api/planning/publiceer-week', { method: 'POST', body }),
     medewerkers: (orgUuid: string) => apiRequest(`/api/planning/medewerkers/${orgUuid}`),

@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
     ActivityIndicator,
     Pressable,
+    StyleProp,
     StyleSheet,
     Text,
     TextInput,
@@ -11,11 +13,11 @@ import {
 } from 'react-native';
 import { colors } from '../lib/theme';
 
-export function Screen({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function Screen({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
     return <View style={[styles.screen, style]}>{children}</View>;
 }
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
     return <View style={[styles.card, style]}>{children}</View>;
 }
 
@@ -29,12 +31,16 @@ export function PrimaryButton({
     loading,
     disabled,
     variant = 'primary',
+    icon,
+    style,
 }: {
     title: string;
     onPress: () => void;
     loading?: boolean;
     disabled?: boolean;
     variant?: 'primary' | 'danger' | 'outline';
+    icon?: keyof typeof Ionicons.glyphMap;
+    style?: StyleProp<ViewStyle>;
 }) {
     const isDisabled = disabled || loading;
     return (
@@ -47,12 +53,23 @@ export function PrimaryButton({
                 variant === 'outline' && styles.buttonOutline,
                 isDisabled && styles.buttonDisabled,
                 pressed && !isDisabled && { opacity: 0.85 },
+                style,
             ]}
         >
             {loading ? (
                 <ActivityIndicator color={variant === 'outline' ? colors.primary : '#fff'} />
             ) : (
-                <Text style={[styles.buttonText, variant === 'outline' && styles.buttonTextOutline]}>{title}</Text>
+                <>
+                    {icon ? (
+                        <Ionicons
+                            name={icon}
+                            size={16}
+                            color={variant === 'outline' ? colors.primary : '#fff'}
+                            style={{ marginRight: 6 }}
+                        />
+                    ) : null}
+                    <Text style={[styles.buttonText, variant === 'outline' && styles.buttonTextOutline]}>{title}</Text>
+                </>
             )}
         </Pressable>
     );

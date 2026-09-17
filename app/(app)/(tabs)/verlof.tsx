@@ -6,7 +6,7 @@ import { Badge, Card, CenteredLoader, EmptyState, ErrorBanner } from '../../../s
 import { TopBar } from '../../../src/components/TopBar';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { useAsyncData } from '../../../src/hooks/useAsyncData';
-import { formatShortDate, statusLabel } from '../../../src/lib/format';
+import { formatShortDate, formatTime, statusLabel } from '../../../src/lib/format';
 import { PlanningApi } from '../../../src/lib/services';
 import { colors } from '../../../src/lib/theme';
 
@@ -45,12 +45,16 @@ export default function VerlofScreen() {
                     ) : (
                         verlofItems.map((item: any) => {
                             const st = statusLabel(item.status);
+                            const zelfdeDag = formatShortDate(item.start_tijd) === formatShortDate(item.eind_tijd);
+                            const isDagdeel = zelfdeDag && (formatTime(item.start_tijd) !== '00:00' || formatTime(item.eind_tijd) !== '23:59');
                             return (
                                 <Card key={item.uuid} style={{ marginBottom: 10 }}>
                                     <View style={styles.rowBetween}>
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.periode}>
-                                                {formatShortDate(item.start_tijd)} — {formatShortDate(item.eind_tijd)}
+                                                {isDagdeel
+                                                    ? `${formatShortDate(item.start_tijd)} · ${formatTime(item.start_tijd)}-${formatTime(item.eind_tijd)}`
+                                                    : `${formatShortDate(item.start_tijd)} — ${formatShortDate(item.eind_tijd)}`}
                                             </Text>
                                             {item.notitie ? <Text style={styles.notitie}>{item.notitie}</Text> : null}
                                             {item.uren ? <Text style={styles.uren}>{item.uren} uur</Text> : null}

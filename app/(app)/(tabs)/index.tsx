@@ -1,25 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useMemo } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Card, CenteredLoader, EmptyState, ErrorBanner } from '../../../src/components/ui';
+import { ShiftDetailsModal } from '../../../src/components/ShiftDetailsModal';
 import { IconButton, TopBar } from '../../../src/components/TopBar';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { useAsyncData } from '../../../src/hooks/useAsyncData';
 import { formatDayLabel, formatTime, statusLabel } from '../../../src/lib/format';
-import { BerichtenApi, PlanningApi } from '../../../src/lib/services';
+import { BerichtenApi, PlanningApi, RuilbeursApi } from '../../../src/lib/services';
+import { telOngezieneRuilUpdates } from '../../../src/lib/ruilNotificaties';
 import { colors, hasRole, PLANNER_PLUS, roleLabels } from '../../../src/lib/theme';
 import type { Bericht } from '../../../src/types';
 
 export default function HomeScreen() {
     const { user } = useAuth();
     const isPlannerPlus = hasRole(user?.rol, PLANNER_PLUS);
+    const [selectedShift, setSelectedShift] = useState<any | null>(null);
+    const [ruilBadge, setRuilBadge] = useState(0);
 
     const rooster = useAsyncData(() => PlanningApi.mijnRooster(user!.uuid) as Promise<any[]>, [user?.uuid]);
     const berichten = useAsyncData(
         () => BerichtenApi.mijnBerichten(user!.uuid, user!.org_uuid) as Promise<Bericht[]>,
         [user?.uuid, user?.org_uuid]
     );
+    const ruilOntvangen = useAsyncData(() => RuilbeursApi.ontvangen(user!.uuid) as Promise<any[]>, [user?.uuid]);
+    const ruilVerzonden = useAsyncData(() => RuilbeursApi.mijnVerzonden(user!.uuid) as Promise<any[]>, [user?.uuid]);
 
     const aankomend = useMemo(() => {
         if (!rooster.data) return [];
@@ -31,10 +37,28 @@ export default function HomeScreen() {
             .slice(0, 4);
     }, [rooster.data]);
 
+    useFocusEffect(
+        useCallback(() => {
+            berichten.refresh();
+            ruilOntvangen.refresh();
+            ruilVerzonden.refresh();
+        }, [user?.uuid, user?.org_uuid])
+    );
+
     const ongelezenBerichten = useMemo(
         () => (berichten.data || []).filter((b: any) => !b.is_gelezen_door_mij).length,
         [berichten.data]
     );
+
+    useEffect(() => {
+        let cancelled = false;
+        telOngezieneRuilUpdates(ruilVerzonden.data).then((ongezien) => {
+            if (!cancelled) setRuilBadge((ruilOntvangen.data || []).length + ongezien);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [ruilOntvangen.data, ruilVerzonden.data]);
 
     const loading = rooster.loading || berichten.loading;
 
@@ -43,7 +67,20 @@ export default function HomeScreen() {
             <TopBar
                 title={`Hoi ${user?.voornaam}!`}
                 subtitle={user ? roleLabels[user.rol] : ''}
-                right={<IconButton name="notifications-outline" badge={ongelezenBerichten} onPress={() => router.push('/(app)/berichten')} />}
+                right={
+                    <View style={{ flexDirection: 'row' }}>
+                        <IconButton
+                            name="swap-horizontal-outline"
+                            badge={ruilBadge}
+                            onPress={() => router.push('/(app)/(tabs)/ruilbeurs')}
+                        />
+                        <IconButton
+                            name="notifications-outline"
+                            badge={ongelezenBerichten}
+                            onPress={() => router.push('/(app)/berichten')}
+                        />
+                    </View>
+                }
             />
             {loading ? (
                 <CenteredLoader />
@@ -51,7 +88,15 @@ export default function HomeScreen() {
                 <ScrollView
                     contentContainerStyle={{ padding: 20 }}
                     refreshControl={
-                        <RefreshControl refreshing={rooster.refreshing} onRefresh={() => { rooster.refresh(); berichten.refresh(); }} />
+                        <RefreshControl
+                            refreshing={rooster.refreshing}
+                            onRefresh={() => {
+                                rooster.refresh();
+                                berichten.refresh();
+                                ruilOntvangen.refresh();
+                                ruilVerzonden.refresh();
+                            }}
+                        />
                     }
                 >
                     <ErrorBanner message={rooster.error || berichten.error} />
@@ -65,18 +110,20 @@ export default function HomeScreen() {
                         aankomend.map((item: any) => {
                             const st = statusLabel(item.status);
                             return (
-                                <Card key={item.uuid} style={{ marginBottom: 10 }}>
-                                    <View style={styles.rowBetween}>
-                                        <View>
-                                            <Text style={styles.dienstDag}>{formatDayLabel(item.start_tijd)}</Text>
-                                            <Text style={styles.dienstTijd}>
-                                                {formatTime(item.start_tijd)} - {formatTime(item.eind_tijd)}
-                                            </Text>
-                                            {item.locatie_naam ? <Text style={styles.dienstLocatie}>{item.locatie_naam}</Text> : null}
+                                <Pressable key={item.uuid} onPress={() => setSelectedShift(item)}>
+                                    <Card style={{ marginBottom: 10 }}>
+                                        <View style={styles.rowBetween}>
+                                            <View>
+                                                <Text style={styles.dienstDag}>{formatDayLabel(item.start_tijd)}</Text>
+                                                <Text style={styles.dienstTijd}>
+                                                    {formatTime(item.start_tijd)} - {formatTime(item.eind_tijd)}
+                                                </Text>
+                                                {item.locatie_naam ? <Text style={styles.dienstLocatie}>{item.locatie_naam}</Text> : null}
+                                            </View>
+                                            <Badge label={st.label} tone={st.tone} />
                                         </View>
-                                        <Badge label={st.label} tone={st.tone} />
-                                    </View>
-                                </Card>
+                                    </Card>
+                                </Pressable>
                             );
                         })
                     )}
@@ -108,6 +155,14 @@ export default function HomeScreen() {
                     ) : null}
                 </ScrollView>
             )}
+
+            <ShiftDetailsModal
+                visible={!!selectedShift}
+                shift={selectedShift}
+                onClose={() => setSelectedShift(null)}
+                onChanged={rooster.refresh}
+                ownShift
+            />
         </View>
     );
 }

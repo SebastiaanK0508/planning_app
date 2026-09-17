@@ -14,6 +14,7 @@ export default function AppLayout() {
             <Stack.Screen name="verlof/nieuw" options={{ title: 'Verlof aanvragen', presentation: 'modal' }} />
             <Stack.Screen name="berichten/index" options={{ title: 'Berichten' }} />
             <Stack.Screen name="berichten/nieuw" options={{ title: 'Nieuw bericht', presentation: 'modal' }} />
+            <Stack.Screen name="berichten/[uuid]" options={{ title: 'Bericht' }} />
             <Stack.Screen name="profiel/index" options={{ title: 'Mijn profiel' }} />
             <Stack.Screen name="profiel/wachtwoord" options={{ title: 'Wachtwoord wijzigen' }} />
             <Stack.Screen name="beheer/index" options={{ title: 'Beheer' }} />

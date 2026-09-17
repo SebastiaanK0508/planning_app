@@ -66,6 +66,8 @@ export function statusLabel(status: string | undefined): { label: string; tone: 
     switch (status) {
         case 'ingepland':
             return { label: 'Ingepland', tone: 'default' };
+        case 'te ruil':
+            return { label: 'Op de ruilbeurs', tone: 'warning' };
         case 'wacht_op_planner':
             return { label: 'Wacht op planner', tone: 'warning' };
         case 'verlof_aanvraag':

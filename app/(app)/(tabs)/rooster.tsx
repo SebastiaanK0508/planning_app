@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import React, { useMemo, useRef, useState } from 'react';
 import { Alert, Linking, PanResponder, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { Calendar } from 'react-native-calendars';
-import { Badge, Card, CenteredLoader, EmptyState, ErrorBanner } from '../../../src/components/ui';
+import { Badge, Card, CenteredLoader, ErrorBanner } from '../../../src/components/ui';
+import { ShiftDetailsModal } from '../../../src/components/ShiftDetailsModal';
 import { IconButton, TopBar } from '../../../src/components/TopBar';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { useAsyncData } from '../../../src/hooks/useAsyncData';
@@ -12,32 +13,31 @@ import { addDays, formatDayLabel, formatTime, isSameDay, parseServerDate, startO
 import { OrganisatieApi, PlanningApi } from '../../../src/lib/services';
 import { colors } from '../../../src/lib/theme';
 
-function ShiftCard({ item }: { item: any }) {
+function ShiftCard({ item, onPress }: { item: any; onPress: () => void }) {
     const isVerlof = String(item.status || '').startsWith('verlof');
+    const teRuil = item.status === 'te ruil';
     return (
-        <Card style={{ marginBottom: 8 }}>
-            <View style={styles.rowBetween}>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.tijd}>
-                        {formatTime(item.start_tijd)} - {formatTime(item.eind_tijd)}
-                    </Text>
-                    {item.locatie_naam ? <Text style={styles.meta}>{item.locatie_naam}</Text> : null}
-                    {item.afdeling_naam ? <Text style={styles.meta}>{item.afdeling_naam}</Text> : null}
-                    {item.notitie ? <Text style={styles.meta}>{item.notitie}</Text> : null}
+        <Pressable onPress={onPress}>
+            <Card style={{ marginBottom: 8 }}>
+                <View style={styles.rowBetween}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.tijd}>
+                            {formatTime(item.start_tijd)} - {formatTime(item.eind_tijd)}
+                        </Text>
+                        {item.locatie_naam ? <Text style={styles.meta}>{item.locatie_naam}</Text> : null}
+                        {item.afdeling_naam ? <Text style={styles.meta}>{item.afdeling_naam}</Text> : null}
+                        {item.notitie ? <Text style={styles.meta}>{item.notitie}</Text> : null}
+                    </View>
+                    {isVerlof ? (
+                        <Badge label="Verlof" tone="warning" />
+                    ) : teRuil ? (
+                        <Badge label="Op de beurs" tone="warning" />
+                    ) : (
+                        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                    )}
                 </View>
-                {isVerlof ? (
-                    <Badge label="Verlof" tone="warning" />
-                ) : item.status === 'ingepland' ? (
-                    <Pressable
-                        onPress={() => router.push({ pathname: '/(app)/(tabs)/ruilbeurs', params: { aanbieden: item.uuid } })}
-                        style={styles.ruilBtn}
-                    >
-                        <Ionicons name="swap-horizontal" size={16} color={colors.primary} />
-                        <Text style={styles.ruilBtnText}>Ruilen</Text>
-                    </Pressable>
-                ) : null}
-            </View>
-        </Card>
+            </Card>
+        </Pressable>
     );
 }
 
@@ -46,6 +46,7 @@ export default function RoosterScreen() {
     const [viewMode, setViewMode] = useState<'week' | 'maand'>('week');
     const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
     const [selectedDate, setSelectedDate] = useState(() => toIsoDate(new Date()));
+    const [selectedShift, setSelectedShift] = useState<any | null>(null);
     const { data, loading, refreshing, error, refresh } = useAsyncData(
         () => PlanningApi.mijnRooster(user!.uuid) as Promise<any[]>,
         [user?.uuid]
@@ -112,6 +113,18 @@ export default function RoosterScreen() {
         [weekItems]
     );
 
+    const dagenMetItems = useMemo(
+        () =>
+            dagen.map((dag) => {
+                const items = weekItems
+                    .filter((item: any) => isSameDay(parseServerDate(item.start_tijd)!, dag))
+                    .sort((a: any, b: any) => new Date(a.start_tijd).getTime() - new Date(b.start_tijd).getTime());
+                const uren = items.reduce((sum: number, item: any) => sum + (Number(item.uren) || 0), 0);
+                return { dag, items, uren };
+            }),
+        [dagen, weekItems]
+    );
+
     const markedDates = useMemo(() => {
         const marks: Record<string, any> = {};
         (data || []).forEach((item: any) => {
@@ -174,22 +187,38 @@ export default function RoosterScreen() {
                     ) : (
                         <ScrollView contentContainerStyle={{ padding: 20 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
                             <ErrorBanner message={error} />
-                            {dagen.map((dag) => {
-                                const items = weekItems.filter((item: any) => isSameDay(parseServerDate(item.start_tijd)!, dag));
+                            {dagenMetItems.map(({ dag, items, uren }) => {
+                                const isVandaag = isSameDay(dag, new Date());
                                 return (
-                                    <View key={dag.toISOString()} style={{ marginBottom: 16 }}>
-                                        <Text style={styles.dayHeader}>{formatDayLabel(dag.toISOString())}</Text>
-                                        {items.length === 0 ? (
-                                            <Card style={styles.emptyDayCard}>
-                                                <Text style={styles.emptyDayText}>Vrij</Text>
-                                            </Card>
-                                        ) : (
-                                            items.map((item: any) => <ShiftCard key={item.uuid} item={item} />)
-                                        )}
+                                    <View key={dag.toISOString()} style={styles.dagBlok}>
+                                        <View style={[styles.dagBlokRand, isVandaag && styles.dagBlokRandVandaag]} />
+                                        <View style={{ flex: 1 }}>
+                                            <View style={styles.dayHeaderRow}>
+                                                <View style={styles.dayHeaderLeft}>
+                                                    <Text style={[styles.dayHeader, isVandaag && styles.dayHeaderVandaag]}>
+                                                        {formatDayLabel(dag.toISOString())}
+                                                    </Text>
+                                                    {isVandaag ? (
+                                                        <View style={styles.vandaagBadge}>
+                                                            <Text style={styles.vandaagBadgeText}>Vandaag</Text>
+                                                        </View>
+                                                    ) : null}
+                                                </View>
+                                                {uren > 0 ? <Text style={styles.dayHeaderUren}>{uren.toFixed(1)} uur</Text> : null}
+                                            </View>
+                                            {items.length === 0 ? (
+                                                <View style={styles.emptyDayRow}>
+                                                    <Text style={styles.emptyDayText}>Vrij</Text>
+                                                </View>
+                                            ) : (
+                                                items.map((item: any) => (
+                                                    <ShiftCard key={item.uuid} item={item} onPress={() => setSelectedShift(item)} />
+                                                ))
+                                            )}
+                                        </View>
                                     </View>
                                 );
                             })}
-                            {weekItems.length === 0 ? <EmptyState title="Geen diensten deze week" /> : null}
                         </ScrollView>
                     )}
                 </>
@@ -224,11 +253,19 @@ export default function RoosterScreen() {
                                 <Text style={styles.emptyDayText}>Vrij</Text>
                             </Card>
                         ) : (
-                            selectedDayItems.map((item: any) => <ShiftCard key={item.uuid} item={item} />)
+                            selectedDayItems.map((item: any) => <ShiftCard key={item.uuid} item={item} onPress={() => setSelectedShift(item)} />)
                         )}
                     </View>
                 </ScrollView>
             )}
+
+            <ShiftDetailsModal
+                visible={!!selectedShift}
+                shift={selectedShift}
+                onClose={() => setSelectedShift(null)}
+                onChanged={refresh}
+                ownShift
+            />
         </View>
     );
 }
@@ -246,20 +283,28 @@ const styles = StyleSheet.create({
     },
     weekNavBtn: { padding: 6 },
     weekLabel: { fontWeight: '700', color: '#0f172a', fontSize: 14 },
-    dayHeader: { fontSize: 14, fontWeight: '700', color: '#334155', marginBottom: 8, textTransform: 'capitalize' },
-    emptyDayCard: { paddingVertical: 14 },
-    emptyDayText: { color: colors.textMuted, fontSize: 13 },
-    rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    tijd: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
-    meta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-    ruilBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
+    dagBlok: { flexDirection: 'row', marginBottom: 20 },
+    dagBlokRand: { width: 3, borderRadius: 2, backgroundColor: colors.border, marginRight: 12 },
+    dagBlokRandVandaag: { backgroundColor: colors.primary },
+    dayHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+    dayHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    dayHeader: { fontSize: 15, fontWeight: '800', color: '#334155', textTransform: 'capitalize' },
+    dayHeaderVandaag: { color: colors.primary },
+    vandaagBadge: { backgroundColor: colors.primary, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+    vandaagBadgeText: { color: '#fff', fontSize: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
+    dayHeaderUren: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.primary,
         backgroundColor: colors.primarySoft,
         borderRadius: 999,
         paddingHorizontal: 10,
-        paddingVertical: 6,
+        paddingVertical: 4,
     },
-    ruilBtnText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
+    emptyDayRow: { paddingVertical: 4, paddingBottom: 4 },
+    emptyDayCard: { paddingVertical: 14 },
+    emptyDayText: { color: colors.textMuted, fontSize: 13, fontStyle: 'italic' },
+    rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    tijd: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
+    meta: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
 });

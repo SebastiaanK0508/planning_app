@@ -4,7 +4,7 @@ import { Badge, Card, CenteredLoader, EmptyState, ErrorBanner, PrimaryButton } f
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { useAsyncData } from '../../../src/hooks/useAsyncData';
 import { ApiError } from '../../../src/lib/api';
-import { formatShortDate } from '../../../src/lib/format';
+import { formatShortDate, formatTime } from '../../../src/lib/format';
 import { AuthApi, VerlofApi } from '../../../src/lib/services';
 import { colors } from '../../../src/lib/theme';
 
@@ -29,11 +29,13 @@ export default function VerlofBeheerScreen() {
             .filter((v: any) => v.status === 'verlof_aanvraag')
             .forEach((v: any) => {
                 if (!map.has(v.uuid)) {
-                    map.set(v.uuid, { ...v, van: v.datum, tot: v.datum });
+                    map.set(v.uuid, { ...v, van: v.datum, tot: v.datum, startTijd: v.start_tijd, eindTijd: v.eind_tijd });
                 } else {
                     const entry = map.get(v.uuid);
                     if (v.datum < entry.van) entry.van = v.datum;
                     if (v.datum > entry.tot) entry.tot = v.datum;
+                    if (new Date(v.start_tijd) < new Date(entry.startTijd)) entry.startTijd = v.start_tijd;
+                    if (new Date(v.eind_tijd) > new Date(entry.eindTijd)) entry.eindTijd = v.eind_tijd;
                 }
             });
         return Array.from(map.values());
@@ -63,13 +65,19 @@ export default function VerlofBeheerScreen() {
                     {perAanvraag.length === 0 ? (
                         <EmptyState title="Geen openstaande verlofaanvragen" />
                     ) : (
-                        perAanvraag.map((v: any) => (
+                        perAanvraag.map((v: any) => {
+                            const isDagdeel =
+                                v.van === v.tot &&
+                                (formatTime(v.startTijd) !== '00:00' || formatTime(v.eindTijd) !== '23:59');
+                            return (
                             <Card key={v.uuid} style={{ marginBottom: 10 }}>
                                 <View style={styles.rowBetween}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.naam}>{naamMap[v.gebruiker_uuid] || 'Onbekend'}</Text>
                                         <Text style={styles.periode}>
-                                            {formatShortDate(v.van)} — {formatShortDate(v.tot)}
+                                            {isDagdeel
+                                                ? `${formatShortDate(v.van)} · ${formatTime(v.startTijd)}-${formatTime(v.eindTijd)}`
+                                                : `${formatShortDate(v.van)} — ${formatShortDate(v.tot)}`}
                                         </Text>
                                         {v.notitie ? <Text style={styles.notitie}>{v.notitie}</Text> : null}
                                     </View>
@@ -81,7 +89,8 @@ export default function VerlofBeheerScreen() {
                                     <PrimaryButton title="Goedkeuren" onPress={() => beslis(v.uuid, 'goedgekeurd')} loading={busy === v.uuid} />
                                 </View>
                             </Card>
-                        ))
+                            );
+                        })
                     )}
                 </ScrollView>
             )}

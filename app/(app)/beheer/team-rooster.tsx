@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Card, CenteredLoader, EmptyState, ErrorBanner } from '../../../src/components/ui';
+import { ShiftDetailsModal } from '../../../src/components/ShiftDetailsModal';
 import { useAuth } from '../../../src/contexts/AuthContext';
 import { useAsyncData } from '../../../src/hooks/useAsyncData';
 import { addDays, formatTime, isSameDay, parseServerDate, startOfWeek, toIsoDate } from '../../../src/lib/format';
@@ -17,6 +18,7 @@ export default function TeamRoosterScreen() {
     const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
     const dagen = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
     const [selectedDay, setSelectedDay] = useState(() => todayIndex());
+    const [selectedShift, setSelectedShift] = useState<any | null>(null);
 
     const goToDay = (delta: number) => {
         setSelectedDay((prev) => {
@@ -101,24 +103,34 @@ export default function TeamRoosterScreen() {
                         dagItems.map((item: any) => {
                             const isVerlof = String(item.status || '').startsWith('verlof');
                             return (
-                                <Card key={item.uuid} style={{ marginBottom: 8 }}>
-                                    <View style={styles.rowBetween}>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.naam}>{item.medewerker_naam}</Text>
-                                            <Text style={styles.tijd}>
-                                                {formatTime(item.start_tijd)} - {formatTime(item.eind_tijd)}
-                                            </Text>
-                                            {item.locatie_naam ? <Text style={styles.meta}>{item.locatie_naam}</Text> : null}
-                                            {item.afdeling_naam ? <Text style={styles.meta}>{item.afdeling_naam}</Text> : null}
+                                <Pressable key={item.uuid} onPress={() => setSelectedShift(item)}>
+                                    <Card style={{ marginBottom: 8 }}>
+                                        <View style={styles.rowBetween}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.naam}>{item.medewerker_naam}</Text>
+                                                <Text style={styles.tijd}>
+                                                    {formatTime(item.start_tijd)} - {formatTime(item.eind_tijd)}
+                                                </Text>
+                                                {item.locatie_naam ? <Text style={styles.meta}>{item.locatie_naam}</Text> : null}
+                                                {item.afdeling_naam ? <Text style={styles.meta}>{item.afdeling_naam}</Text> : null}
+                                            </View>
+                                            {isVerlof ? <Badge label="Verlof" tone="warning" /> : <Badge label={item.status} />}
                                         </View>
-                                        {isVerlof ? <Badge label="Verlof" tone="warning" /> : <Badge label={item.status} />}
-                                    </View>
-                                </Card>
+                                    </Card>
+                                </Pressable>
                             );
                         })
                     )}
                 </ScrollView>
             )}
+
+            <ShiftDetailsModal
+                visible={!!selectedShift}
+                shift={selectedShift}
+                onClose={() => setSelectedShift(null)}
+                ownShift={false}
+                medewerkerNaam={selectedShift?.medewerker_naam}
+            />
         </View>
     );
 }

@@ -7,6 +7,7 @@ import { useAuth } from '../../../src/contexts/AuthContext';
 import { useAsyncData } from '../../../src/hooks/useAsyncData';
 import { ApiError } from '../../../src/lib/api';
 import { formatDayLabel, formatTime, statusLabel } from '../../../src/lib/format';
+import { markeerRuilUpdatesGezien } from '../../../src/lib/ruilNotificaties';
 import { OrganisatieApi, RuilbeursApi } from '../../../src/lib/services';
 import { colors } from '../../../src/lib/theme';
 
@@ -17,6 +18,10 @@ export default function RuilbeursScreen() {
 
     const ontvangen = useAsyncData(() => RuilbeursApi.ontvangen(user!.uuid) as Promise<any[]>, [user?.uuid]);
     const verzonden = useAsyncData(() => RuilbeursApi.mijnVerzonden(user!.uuid) as Promise<any[]>, [user?.uuid]);
+
+    useEffect(() => {
+        markeerRuilUpdatesGezien(verzonden.data);
+    }, [verzonden.data]);
 
     const [aanbiedenDienst, setAanbiedenDienst] = useState<string | null>(null);
     const [collegas, setCollegas] = useState<any[]>([]);
@@ -107,9 +112,21 @@ export default function RuilbeursScreen() {
                                     </Text>
                                 ) : null}
                                 <View style={styles.actionsRow}>
-                                    <PrimaryButton title="Weigeren" variant="outline" onPress={() => weigeren(v.uuid)} loading={busyId === v.uuid} />
-                                    <View style={{ width: 10 }} />
-                                    <PrimaryButton title="Accepteren" onPress={() => accepteren(v.uuid)} loading={busyId === v.uuid} />
+                                    <PrimaryButton
+                                        title="Weigeren"
+                                        icon="close"
+                                        variant="outline"
+                                        onPress={() => weigeren(v.uuid)}
+                                        loading={busyId === v.uuid}
+                                        style={{ flex: 1 }}
+                                    />
+                                    <PrimaryButton
+                                        title="Accepteren"
+                                        icon="checkmark"
+                                        onPress={() => accepteren(v.uuid)}
+                                        loading={busyId === v.uuid}
+                                        style={{ flex: 1 }}
+                                    />
                                 </View>
                             </Card>
                         ))
@@ -174,7 +191,7 @@ const styles = StyleSheet.create({
     van: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
     dienstLine: { fontSize: 13, color: '#334155', marginTop: 4 },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-    actionsRow: { flexDirection: 'row', marginTop: 12 },
+    actionsRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.4)', justifyContent: 'flex-end' },
     modalSheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 },
     modalTitle: { fontSize: 17, fontWeight: '800', color: '#0f172a', marginBottom: 4 },
