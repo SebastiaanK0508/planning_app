@@ -10,3 +10,9 @@ export const API_URL =
     'https://app.webplanning.nl';
 
 export const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+
+/** Volledige URL voor een profielfoto-pad uit de backend (bv. '/uploads/avatars/x.jpg'). */
+export function fotoUrl(pad: string | null | undefined): string | null {
+    if (!pad) return null;
+    return /^https?:\/\//.test(pad) ? pad : `${API_URL}${pad.startsWith('/') ? '' : '/'}${pad}`;
+}

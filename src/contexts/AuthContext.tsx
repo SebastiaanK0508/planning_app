@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiRequest, clearSession, getStoredUser, getToken, onUnauthorized, setSession } from '../lib/api';
+import { afmeldenPush } from '../lib/push';
 import type { User } from '../types';
 
 interface LoginResponse {
@@ -46,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const logout = useCallback(async () => {
+        await afmeldenPush();
         await clearSession();
         setUser(null);
     }, []);

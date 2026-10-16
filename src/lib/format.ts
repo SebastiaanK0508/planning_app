@@ -7,7 +7,8 @@ const MAANDEN = [
 export function parseServerDate(value: string | null | undefined): Date | null {
     if (!value) return null;
     // MySQL geeft 'YYYY-MM-DD HH:mm:ss' terug (zonder tijdzone) -> lokaal interpreteren.
-    const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+    // Alleen een datum ('YYYY-MM-DD') zou als UTC geparsed worden; forceer lokale middernacht.
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value.includes('T') ? value : value.replace(' ', 'T');
     const d = new Date(normalized);
     return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -62,35 +63,102 @@ export function initials(voornaam?: string, achternaam?: string): string {
     return `${(voornaam || '?').charAt(0)}${(achternaam || '').charAt(0)}`.toUpperCase();
 }
 
-export function statusLabel(status: string | undefined): { label: string; tone: 'default' | 'success' | 'danger' | 'warning' } {
+type Tone = 'default' | 'blue' | 'emerald' | 'amber' | 'rose' | 'purple';
+
+// Labels en kleuren volgen mijn_rooster.html / verlof.html op het web.
+export function statusLabel(status: string | null | undefined): { label: string; tone: Tone } {
     switch (status) {
         case 'ingepland':
-            return { label: 'Ingepland', tone: 'default' };
+        case undefined:
+        case null:
+        case '':
+            return { label: 'Ingepland', tone: 'blue' };
+        case 'bevestigd':
+            return { label: 'Bevestigd', tone: 'emerald' };
+        case 'concept':
+            return { label: 'Concept', tone: 'default' };
         case 'te ruil':
-            return { label: 'Op de ruilbeurs', tone: 'warning' };
+            return { label: 'Op de beurs', tone: 'amber' };
         case 'wacht_op_planner':
-            return { label: 'Wacht op planner', tone: 'warning' };
+            return { label: 'Wacht op planner', tone: 'amber' };
+        case 'wacht_op_manager':
+            return { label: 'Bij planner', tone: 'amber' };
+        case 'ziek':
+            return { label: 'Ziek', tone: 'rose' };
         case 'verlof_aanvraag':
-            return { label: 'Verlof: aangevraagd', tone: 'warning' };
+            return { label: 'Verlof aangevraagd', tone: 'purple' };
         case 'verlof_goedgekeurd':
-            return { label: 'Verlof: goedgekeurd', tone: 'success' };
+            return { label: 'Verlof akkoord', tone: 'emerald' };
         case 'verlof_afgewezen':
-            return { label: 'Verlof: afgewezen', tone: 'danger' };
+            return { label: 'Verlof afgewezen', tone: 'rose' };
         case 'in_afwachting':
-            return { label: 'In afwachting', tone: 'warning' };
+            return { label: 'Wachtend', tone: 'amber' };
         case 'goedgekeurd':
-            return { label: 'Goedgekeurd', tone: 'success' };
+            return { label: 'Geregeld', tone: 'emerald' };
         case 'afgewezen':
-            return { label: 'Afgewezen', tone: 'danger' };
+            return { label: 'Afgewezen', tone: 'rose' };
         case 'geannuleerd':
-            return { label: 'Geannuleerd', tone: 'danger' };
+            return { label: 'Geannuleerd', tone: 'rose' };
         case 'open':
-            return { label: 'Open', tone: 'warning' };
+            return { label: 'In afwachting', tone: 'blue' };
         case 'geaccepteerd':
-            return { label: 'Geaccepteerd', tone: 'success' };
+            return { label: 'Geaccepteerd', tone: 'emerald' };
         case 'geweigerd':
-            return { label: 'Geweigerd', tone: 'danger' };
+            return { label: 'Geweigerd', tone: 'rose' };
+        case 'mislukt':
+            return { label: 'Mislukt', tone: 'rose' };
         default:
             return { label: status || 'Onbekend', tone: 'default' };
     }
+}
+
+export function isVerlofStatus(status: string | undefined | null): boolean {
+    return String(status || '').startsWith('verlof') || status === 'in_afwachting';
+}
+
+/** ISO-weeknummer. */
+export function weekNummer(date: Date): number {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dag = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dag);
+    const jaarStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d.getTime() - jaarStart.getTime()) / 864e5 + 1) / 7);
+}
+
+/** Uren als "7,5" (max. 2 decimalen, NL-notatie). */
+export function formatUren(uren: number | string | null | undefined): string {
+    const n = Number(uren) || 0;
+    return n.toLocaleString('nl-NL', { maximumFractionDigits: 2 });
+}
+
+export function dagdeel(start: string | null | undefined): 'ochtend' | 'middag' | 'avond' {
+    const d = parseServerDate(start);
+    const h = d ? d.getHours() : 9;
+    if (h < 12) return 'ochtend';
+    if (h < 18) return 'middag';
+    return 'avond';
+}
+
+/** 'YYYY-MM-DD HH:MM:SS' voor de backend, in lokale tijd. */
+export function toServerDateTime(date: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${toIsoDate(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+}
+
+export function shortDayMonth(date: Date): string {
+    return date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+}
+
+/** Zoeken zonder accenten/hoofdletters, zoals de kennisbank en lijsten op het web. */
+export function normaliseer(tekst: string | null | undefined): string {
+    return String(tekst || '')
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase();
+}
+
+/** Vergelijkt uuids ongeacht streepjes/hoofdletters (backend geeft beide vormen terug). */
+export function zelfdeUuid(a: string | null | undefined, b: string | null | undefined): boolean {
+    if (!a || !b) return false;
+    return a.replace(/-/g, '').toLowerCase() === b.replace(/-/g, '').toLowerCase();
 }

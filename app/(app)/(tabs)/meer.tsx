@@ -2,26 +2,55 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Card } from '../../../src/components/ui';
 import { TopBar } from '../../../src/components/TopBar';
+import { Avatar, Badge } from '../../../src/components/ui';
+import { useAppStatus } from '../../../src/contexts/AppStatusContext';
 import { useAuth } from '../../../src/contexts/AuthContext';
-import { initials } from '../../../src/lib/format';
+import { useMijnInstellingen } from '../../../src/hooks/useMijnInstellingen';
+import { APP_VERSION, fotoUrl } from '../../../src/lib/config';
 import { colors, hasRole, PLANNER_PLUS, roleLabels } from '../../../src/lib/theme';
 
-function MenuRow({ icon, label, onPress, danger }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; danger?: boolean }) {
+type Item = { icon: keyof typeof Ionicons.glyphMap; label: string; href: any; badge?: number };
+
+// Zelfde indeling als het menu op het web (navigation.js): Persoonlijk, Beheer, Organisatie, System Admin.
+function Tegel({ item }: { item: Item }) {
     return (
-        <Pressable onPress={onPress} style={styles.row}>
-            <Ionicons name={icon} size={20} color={danger ? colors.danger : colors.primary} />
-            <Text style={[styles.rowText, danger && { color: colors.danger }]}>{label}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />
+        <Pressable onPress={() => router.push(item.href)} style={({ pressed }) => [styles.tegel, pressed && { backgroundColor: colors.primarySoft, borderColor: colors.primaryBorder }]}>
+            <View style={styles.tegelIcoon}>
+                <Ionicons name={item.icon} size={20} color={colors.primary} />
+            </View>
+            <Text style={styles.tegelLabel} numberOfLines={1}>
+                {item.label}
+            </Text>
+            {item.badge ? (
+                <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
+                </View>
+            ) : null}
         </Pressable>
+    );
+}
+
+function Groep({ titel, items }: { titel: string; items: Item[] }) {
+    return (
+        <>
+            <Text style={styles.groepTitel}>{titel}</Text>
+            <View style={styles.grid}>
+                {items.map((i) => (
+                    <Tegel key={i.label} item={i} />
+                ))}
+            </View>
+        </>
     );
 }
 
 export default function MeerScreen() {
     const { user, logout } = useAuth();
-    const isPlannerPlus = hasRole(user?.rol, PLANNER_PLUS);
+    const { profielfoto } = useMijnInstellingen();
+    const { ongelezenBerichten, beheerOpen } = useAppStatus();
+    const isPlanner = hasRole(user?.rol, PLANNER_PLUS);
     const isSuperAdmin = user?.rol === 'super_admin';
+    const magAbonnement = user?.rol === 'beheerder' || user?.rol === 'eigenaar';
 
     function confirmLogout() {
         Alert.alert('Uitloggen', 'Weet je zeker dat je wilt uitloggen?', [
@@ -30,91 +59,97 @@ export default function MeerScreen() {
         ]);
     }
 
+    const persoonlijk: Item[] = [
+        { icon: 'calendar-outline', label: 'Mijn rooster', href: '/(app)/(tabs)/rooster' },
+        { icon: 'airplane-outline', label: 'Verlof', href: '/(app)/(tabs)/verlof' },
+        { icon: 'swap-horizontal', label: 'Ruilbeurs', href: '/(app)/(tabs)/ruilbeurs' },
+        { icon: 'chatbubble-ellipses-outline', label: 'Berichten', href: '/(app)/berichten', badge: ongelezenBerichten },
+        { icon: 'person-circle-outline', label: 'Profiel', href: '/(app)/profiel' },
+        { icon: 'help-buoy-outline', label: 'Support', href: '/(app)/support' },
+        { icon: 'book-outline', label: 'Kennisbank', href: '/(app)/kennisbank' },
+        { icon: 'people-outline', label: 'Team rooster', href: '/(app)/beheer/team-rooster' },
+    ];
+    const beheer: Item[] = [
+        { icon: 'pie-chart-outline', label: 'Dashboard', href: '/(app)/beheer' },
+        { icon: 'create-outline', label: 'Planning', href: '/(app)/beheer/planning' },
+        { icon: 'git-compare-outline', label: 'Ruil & verlof', href: '/(app)/beheer/ruil-verlof', badge: beheerOpen },
+        { icon: 'megaphone-outline', label: 'Mededelingen', href: '/(app)/beheer/mededelingen' },
+        { icon: 'stopwatch-outline', label: 'Uren', href: '/(app)/beheer/uren' },
+    ];
+    const organisatie: Item[] = [
+        { icon: 'people-outline', label: 'Medewerkers', href: '/(app)/beheer/medewerkers' },
+        { icon: 'location-outline', label: 'Locaties', href: '/(app)/beheer/locaties' },
+        { icon: 'settings-outline', label: 'Instellingen', href: '/(app)/beheer/instellingen' },
+        ...(magAbonnement ? [{ icon: 'card-outline' as const, label: 'Abonnement', href: '/(app)/beheer/abonnement' }] : []),
+    ];
+
     return (
-        <View style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-            <TopBar title="Meer" />
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
-                <Pressable style={styles.profileCard} onPress={() => router.push('/(app)/profiel')}>
-                    <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>{initials(user?.voornaam, user?.achternaam)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.naam}>
+        <View style={{ flex: 1, backgroundColor: colors.bg }}>
+            <TopBar icon="grid" title="Menu" />
+            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+                <Pressable style={styles.profiel} onPress={() => router.push('/(app)/profiel')}>
+                    <View style={styles.glow} />
+                    <Avatar uri={fotoUrl(profielfoto)} naam={`${user?.voornaam || ''} ${user?.achternaam || ''}`} size={52} />
+                    <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={styles.naam} numberOfLines={1}>
                             {user?.voornaam} {user?.achternaam}
                         </Text>
-                        <Text style={styles.rol}>{user ? roleLabels[user.rol] : ''}</Text>
+                        <Badge label={user ? roleLabels[user.rol] : ''} tone="blue" />
                     </View>
-                    <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
+                    <Ionicons name="chevron-forward" size={20} color="#64748b" />
                 </Pressable>
 
-                <Text style={styles.sectionTitle}>Account</Text>
-                <Card style={{ padding: 4 }}>
-                    <MenuRow icon="person-outline" label="Mijn profiel" onPress={() => router.push('/(app)/profiel')} />
-                    <MenuRow icon="lock-closed-outline" label="Wachtwoord wijzigen" onPress={() => router.push('/(app)/profiel/wachtwoord')} />
-                    <MenuRow icon="chatbubbles-outline" label="Berichten" onPress={() => router.push('/(app)/berichten')} />
-                    <MenuRow icon="help-buoy-outline" label="Support" onPress={() => router.push('/(app)/support')} />
-                </Card>
-
-                {isPlannerPlus ? (
-                    <>
-                        <Text style={styles.sectionTitle}>Beheer</Text>
-                        <Card style={{ padding: 4 }}>
-                            <MenuRow icon="briefcase-outline" label="Beheerpaneel" onPress={() => router.push('/(app)/beheer')} />
-                        </Card>
-                    </>
-                ) : null}
-
+                <Groep titel="Persoonlijk" items={persoonlijk} />
+                {isPlanner ? <Groep titel="Beheer" items={beheer} /> : null}
+                {isPlanner ? <Groep titel="Organisatie" items={organisatie} /> : null}
                 {isSuperAdmin ? (
-                    <>
-                        <Text style={styles.sectionTitle}>Platform</Text>
-                        <Card style={{ padding: 4 }}>
-                            <MenuRow icon="shield-checkmark-outline" label="Platformbeheer" onPress={() => router.push('/(app)/admin')} />
-                        </Card>
-                    </>
+                    <Groep titel="System Admin" items={[{ icon: 'shield-checkmark-outline', label: 'Platformbeheer', href: '/(app)/admin' }]} />
                 ) : null}
 
-                <Text style={styles.sectionTitle}>Sessie</Text>
-                <Card style={{ padding: 4 }}>
-                    <MenuRow icon="log-out-outline" label="Uitloggen" onPress={confirmLogout} danger />
-                </Card>
+                <Pressable onPress={confirmLogout} style={styles.uitloggen}>
+                    <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+                    <Text style={styles.uitloggenText}>Uitloggen</Text>
+                </Pressable>
+                <Text style={styles.versie}>Webplanning app v{APP_VERSION}</Text>
             </ScrollView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    profileCard: {
+    profiel: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.ink, borderRadius: 24, padding: 16, overflow: 'hidden' },
+    glow: { position: 'absolute', width: 160, height: 160, borderRadius: 80, backgroundColor: colors.primary, opacity: 0.3, top: -80, right: -40 },
+    naam: { fontSize: 17, fontWeight: '900', color: '#fff', letterSpacing: -0.3 },
+    groepTitel: { fontSize: 10, fontWeight: '900', color: colors.subtle, textTransform: 'uppercase', letterSpacing: 1.4, marginTop: 22, marginBottom: 10, marginLeft: 4 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    tegel: {
+        flexBasis: '47%',
+        flexGrow: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
+        gap: 10,
         backgroundColor: '#fff',
-        borderRadius: 16,
         borderWidth: 1,
-        borderColor: colors.border,
-        padding: 16,
-        marginBottom: 20,
+        borderColor: colors.line,
+        borderRadius: 16,
+        padding: 12,
     },
-    avatar: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
-        backgroundColor: colors.primary,
+    tegelIcoon: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    tegelLabel: { flex: 1, fontSize: 13, fontWeight: '800', color: colors.ink },
+    badge: { backgroundColor: '#ef4444', borderRadius: 999, minWidth: 20, height: 20, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center' },
+    badgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+    uitloggen: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 8,
+        marginTop: 26,
+        paddingVertical: 14,
+        borderRadius: 16,
+        backgroundColor: colors.dangerSoft,
+        borderWidth: 1,
+        borderColor: '#ffe4e6',
     },
-    avatarText: { color: '#fff', fontWeight: '800', fontSize: 18 },
-    naam: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
-    rol: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
-    sectionTitle: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: colors.textMuted,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        marginBottom: 8,
-        marginTop: 16,
-        marginLeft: 4,
-    },
-    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 12 },
-    rowText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#0f172a' },
+    uitloggenText: { color: colors.danger, fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.8 },
+    versie: { textAlign: 'center', color: colors.subtle, fontSize: 12, fontWeight: '600', marginTop: 16 },
 });

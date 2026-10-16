@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { ScrollView } from 'react-native';
-import { ErrorBanner, PrimaryButton, TextField } from '../../../src/components/ui';
+import { Alert, ScrollView } from 'react-native';
+import { Card, ErrorBanner, PasswordField, PrimaryButton } from '../../../src/components/ui';
 import { ApiError } from '../../../src/lib/api';
 import { AuthApi } from '../../../src/lib/services';
+import { colors } from '../../../src/lib/theme';
 
 export default function WachtwoordScreen() {
     const [huidig, setHuidig] = useState('');
@@ -29,6 +30,7 @@ export default function WachtwoordScreen() {
         setLoading(true);
         try {
             await AuthApi.changePassword(huidig, nieuw);
+            Alert.alert('Gewijzigd', 'Je wachtwoord is gewijzigd.');
             router.back();
         } catch (err) {
             setError(err instanceof ApiError ? err.message : 'Wijzigen is mislukt.');
@@ -38,12 +40,14 @@ export default function WachtwoordScreen() {
     }
 
     return (
-        <ScrollView contentContainerStyle={{ padding: 20, backgroundColor: '#f8fafc', flexGrow: 1 }}>
+        <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: 16, flexGrow: 1 }} keyboardShouldPersistTaps="handled">
             <ErrorBanner message={error} />
-            <TextField label="Huidig wachtwoord" secureTextEntry value={huidig} onChangeText={setHuidig} />
-            <TextField label="Nieuw wachtwoord" secureTextEntry value={nieuw} onChangeText={setNieuw} />
-            <TextField label="Herhaal nieuw wachtwoord" secureTextEntry value={herhaal} onChangeText={setHerhaal} />
-            <PrimaryButton title="Wachtwoord wijzigen" onPress={handleSubmit} loading={loading} />
+            <Card>
+                <PasswordField label="Huidig wachtwoord" value={huidig} onChangeText={setHuidig} autoComplete="current-password" />
+                <PasswordField label="Nieuw wachtwoord" value={nieuw} onChangeText={setNieuw} hint="Minimaal 8 tekens" autoComplete="new-password" />
+                <PasswordField label="Herhaal nieuw wachtwoord" value={herhaal} onChangeText={setHerhaal} autoComplete="new-password" />
+                <PrimaryButton title="Wachtwoord wijzigen" icon="lock-closed-outline" onPress={handleSubmit} loading={loading} />
+            </Card>
         </ScrollView>
     );
 }

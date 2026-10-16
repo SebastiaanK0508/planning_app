@@ -7,11 +7,22 @@ const USER_KEY = 'webplanning_user';
 export class ApiError extends Error {
     status: number;
     payload: unknown;
+    /** Backend-foutcode, bv. 'alleen_lezen' | 'geblokkeerd' | 'org_inactief' | 'gebruikerslimiet' bij 402. */
+    code?: string;
     constructor(message: string, status: number, payload: unknown) {
         super(message);
         this.status = status;
         this.payload = payload;
+        if (payload && typeof payload === 'object' && typeof (payload as any).code === 'string') {
+            this.code = (payload as any).code;
+        }
     }
+}
+
+let paymentRequiredHandler: ((code: string | undefined) => void) | null = null;
+/** Wordt aangeroepen bij een 402 (abonnement verlopen/geblokkeerd), zodat de app een banner kan tonen. */
+export function onPaymentRequired(handler: (code: string | undefined) => void) {
+    paymentRequiredHandler = handler;
 }
 
 let unauthorizedHandler: (() => void) | null = null;
@@ -96,19 +107,21 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
 
     if (!response.ok) {
         const message = extractErrorMessage(payload, response.status);
-        throw new ApiError(message, response.status, payload);
+        const error = new ApiError(message, response.status, payload);
+        if (response.status === 402 && error.code !== 'gebruikerslimiet') paymentRequiredHandler?.(error.code);
+        throw error;
     }
 
     return payload as T;
 }
 
-export async function apiUpload<T = unknown>(path: string, formData: FormData): Promise<T> {
+export async function apiUpload<T = unknown>(path: string, formData: FormData, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
     const token = await getToken();
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
 
     const response = await fetch(buildUrl(path), {
-        method: 'POST',
+        method,
         headers,
         body: formData,
     });
@@ -130,7 +143,9 @@ export async function apiUpload<T = unknown>(path: string, formData: FormData): 
 
     if (!response.ok) {
         const message = extractErrorMessage(payload, response.status);
-        throw new ApiError(message, response.status, payload);
+        const error = new ApiError(message, response.status, payload);
+        if (response.status === 402 && error.code !== 'gebruikerslimiet') paymentRequiredHandler?.(error.code);
+        throw error;
     }
 
     return payload as T;

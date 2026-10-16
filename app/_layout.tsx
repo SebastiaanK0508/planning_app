@@ -3,15 +3,25 @@ import React, { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { AppStatusProvider } from '../src/contexts/AppStatusContext';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { CenteredLoader } from '../src/components/ui';
 import { usePushRegistration } from '../src/hooks/usePushRegistration';
+import { luisterNaarMeldingen } from '../src/lib/push';
 
 function RootNavigator() {
     const { user, isLoading } = useAuth();
     const segments = useSegments();
     const router = useRouter();
-    usePushRegistration(!!user);
+    usePushRegistration(!!user, (user?.instellingen as any)?.push === false);
+
+    // Tik op een pushmelding: open het bijbehorende scherm.
+    useEffect(() => {
+        if (!user) return;
+        let stop = () => {};
+        luisterNaarMeldingen((route) => router.push(route as any)).then((s) => (stop = s));
+        return () => stop();
+    }, [user?.uuid]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (isLoading) return;
@@ -34,8 +44,10 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
                 <AuthProvider>
-                    <StatusBar style="dark" />
-                    <RootNavigator />
+                    <AppStatusProvider>
+                        <StatusBar style="dark" />
+                        <RootNavigator />
+                    </AppStatusProvider>
                 </AuthProvider>
             </SafeAreaProvider>
         </GestureHandlerRootView>

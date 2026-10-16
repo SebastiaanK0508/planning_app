@@ -60,7 +60,8 @@
           "cameraPermission": "Webplanning gebruikt de camera om een profielfoto te maken."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true
