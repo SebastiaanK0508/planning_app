@@ -20,7 +20,7 @@
       }
     },
     "android": {
-      "package": "nl.webplanning.app",
+      "package": "webplanning.nl",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
